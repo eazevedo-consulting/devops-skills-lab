@@ -1,0 +1,50 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-east-1'
+        CLUSTER_NAME = 'eks-lab-cluster'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Kubernetes Login') {
+            steps {
+                script {
+                    sh "aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}"
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    sh "kubectl apply -f nginx-deployment.yaml"
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    sh "kubectl get pods"
+                    sh "kubectl get svc nginx-service"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment to EKS was successful!"
+        }
+        failure {
+            echo "Deployment failed."
+        }
+    }
+}

@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    networks:
+      - keycloak-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.0
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_LOG_LEVEL: "INFO"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - keycloak-network
+
+  setup:
+    build: ./setup
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DEMO_APP_SECRET: ${KC_DEMO_APP_SECRET}
+    depends_on:
+      - keycloak
+    networks:
+      - keycloak-network
+
+  demo-app:
+    build: ./demo-app
+    ports:
+      - "3000:3000"
+    environment:
+      INTERNAL_ISSUER_URL: http://keycloak:8080/realms/corp-internal
+      EXTERNAL_ISSUER_URL: http://localhost:8080/realms/corp-internal
+      CLIENT_ID: demo-app
+      BASE_URL: http://localhost:3000
+      SECRET: ${NODE_APP_SECRET}
+      CLIENT_SECRET: ${KC_DEMO_APP_SECRET}
+    networks:
+      - keycloak-network
+    depends_on:
+      - setup
+
+networks:
+  keycloak-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
