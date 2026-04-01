@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Azure Infra-on-Demand Portal</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .form-section { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; }
+        .request-item { border-bottom: 1px solid #eee; padding: 10px; }
+        .status-PENDING { color: orange; }
+        .status-APPROVED { color: green; }
+        .status-REJECTED { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Azure Infrastructure-on-Demand</h1>
+
+    <div class="form-section">
+        <h2>Submit New Request</h2>
+        <form id="infraForm">
+            <label>Environment Name: <input type="text" id="env_name" required></label><br><br>
+            <label>Region: 
+                <select id="region">
+                    <option value="eastus">East US</option>
+                    <option value="westeurope">West Europe</option>
+                    <option value="brazilsouth">Brazil South</option>
+                </select>
+            </label><br><br>
+            <label><input type="checkbox" id="create_storage"> Storage Account</label><br>
+            <label><input type="checkbox" id="create_vm"> Linux VM</label><br><br>
+            <button type="submit">Submit Request</button>
+        </form>
+    </div>
+
+    <div id="requestList">
+        <h2>Recent Requests</h2>
+        <div id="items"></div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8000";
+
+        document.getElementById('infraForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                env_name: document.getElementById('env_name').value,
+                region: document.getElementById('region').value,
+                create_storage: document.getElementById('create_storage').checked,
+                create_vm: document.getElementById('create_vm').checked
+            };
+            await fetch(`${API_BASE}/request`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            loadRequests();
+        };
+
+        async function loadRequests() {
+            const resp = await fetch(`${API_BASE}/requests`);
+            const requests = await resp.json();
+            const itemsDiv = document.getElementById('items');
+            itemsDiv.innerHTML = requests.map(r => `
+                <div class="request-item">
+                    <strong>${r.env_name}</strong> (${r.region}) - 
+                    <span class="status-${r.status}">${r.status}</span>
+                    ${r.status === 'PENDING' ? `
+                        <button onclick="approve(${r.id})">Approve</button>
+                        <button onclick="reject(${r.id})">Reject</button>
+                    ` : ""}
+                </div>
+            `).join('');
+        }
+
+        async function approve(id) {
+            await fetch(`${API_BASE}/requests/${id}/approve`, { method: 'POST' });
+            loadRequests();
+        }
+
+        async function reject(id) {
+            const reason = prompt("Enter rejection reason:");
+            await fetch(`${API_BASE}/requests/${id}/reject?reason=${reason}`, { method: 'POST' });
+            loadRequests();
+        }
+
+        loadRequests();
+    </script>
+</body>
+</html>

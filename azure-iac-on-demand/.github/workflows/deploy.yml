@@ -1,0 +1,79 @@
+name: "Deploy Azure Infrastructure on Demand"
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "ID of the request in the portal"
+        required: true
+      action:
+        description: "Action to perform (apply|destroy)"
+        required: true
+        default: "apply"
+      env_name:
+        description: "Environment name"
+        required: true
+      region:
+        description: "Azure Region"
+        required: true
+      create_storage:
+        description: "Create Storage Account"
+        required: true
+        default: "false"
+      create_vm:
+        description: "Create VM"
+        required: true
+        default: "false"
+
+jobs:
+  terraform:
+    name: "Terraform ${GITHUB_EVENT_INPUTS_ACTION}"
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RG }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_SA }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=req-${{ github.event.inputs.request_id }}.tfstate"
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color \
+            -var="env_name=${{ github.event.inputs.env_name }}" \
+            -var="region=${{ github.event.inputs.region }}" \
+            -var="create_storage=${{ github.event.inputs.create_storage }}" \
+            -var="create_vm=${{ github.event.inputs.create_vm }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: terraform destroy -auto-approve \
+            -var="env_name=${{ github.event.inputs.env_name }}" \
+            -var="region=${{ github.event.inputs.region }}" \
+            -var="create_storage=${{ github.event.inputs.create_storage }}" \
+            -var="create_vm=${{ github.event.inputs.create_vm }}"
+
+      - name: Save Log Summary
+        run: |
+          echo "### Request ID: ${{ github.event.inputs.request_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "Action: ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "Status: Success" >> $GITHUB_STEP_SUMMARY
