@@ -9,6 +9,7 @@ A collection of functional infrastructure-as-code and configuration labs.
 | 🏗️ [AWS EKS Lab](./terraform-eks-lab) | Terraform, EKS, Jenkins, Kubernetes | Deploy an EKS cluster and Nginx application via CI/CD pipeline. |
 | 🖥️ [Local VM Cluster Lab](./terraform-k8s-vanilla-lab) | Vagrant, Terraform, Kubernetes | Multi-node Kubernetes cluster (Master/Workers) running on local Ubuntu VMs. |
 | 🔐 [Keycloak SSO Lab](./keycloak-sso-lab) | Docker Compose, PostgreSQL, OIDC, SAML | Advanced SSO setup with identity brokering, custom claims, and OIDC/SAML testing. |
+| 🚀 [Azure Infra-on-Demand](./azure-iac-on-demand) | FastAPI, Terraform, GitHub Actions | Self-service portal to request and approve Azure infrastructure deployments. |
 
 ---
 
