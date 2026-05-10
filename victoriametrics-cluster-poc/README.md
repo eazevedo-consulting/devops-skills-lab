@@ -43,7 +43,7 @@ The stack uses the **VictoriaMetrics Cluster** architecture, which is split into
 ### Accessing the Services
 - **Grafana**: [http://localhost:3000](http://localhost:3000) (User: `admin` / Password: `admin`)
 - **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) (User: `guest` / Password: `guest`)
-- **Nginx Frontend**: [http://localhost:8080](http://localhost:8080)
+- **Nginx Frontend**: [http://localhost:80](http://localhost:80)
 - **VictoriaMetrics VMUI**: [http://localhost:8481/select/0/vmui/](http://localhost:8481/select/0/vmui/)
 
 ### Important Notes
@@ -90,7 +90,7 @@ Esta stack utiliza a arquitetura **VictoriaMetrics Cluster**, que é dividida em
 ### Acessando os Serviços
 - **Grafana**: [http://localhost:3000](http://localhost:3000) (Usuário: `admin` / Senha: `admin`)
 - **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) (Usuário: `guest` / Senha: `guest`)
-- **Nginx Frontend**: [http://localhost:8080](http://localhost:8080)
+- **Nginx Frontend**: [http://localhost:80](http://localhost:80)
 - **VictoriaMetrics VMUI**: [http://localhost:8481/select/0/vmui/](http://localhost:8481/select/0/vmui/)
 
 ### Notas Importantes
