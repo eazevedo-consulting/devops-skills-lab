@@ -46,6 +46,11 @@ The stack uses the **VictoriaMetrics Cluster** architecture, which is split into
 - **Nginx Frontend**: [http://localhost:8080](http://localhost:8080)
 - **VictoriaMetrics VMUI**: [http://localhost:8481/select/0/vmui/](http://localhost:8481/select/0/vmui/)
 
+### Important Notes
+- **Scalability**: If you need more storage, you can run `docker-compose up -d --scale vmstorage=2` (although discovery flags need adjustment in production, in local Docker the cluster mode facilitates process separation).
+- **Grafana**: Remember that the Prometheus URL in Grafana should now be: `http://vmselect:8481/select/0/prometheus/`.
+- **Permissions**: If the "cannot read" error persists in the `vmagent` log, check if you... messed up! Wait, sorry. Check if you created the `prometheus.yml` file as root while trying to run docker with another user.
+
 ---
 
 <a name="português"></a>
@@ -87,3 +92,8 @@ Esta stack utiliza a arquitetura **VictoriaMetrics Cluster**, que é dividida em
 - **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) (Usuário: `guest` / Senha: `guest`)
 - **Nginx Frontend**: [http://localhost:8080](http://localhost:8080)
 - **VictoriaMetrics VMUI**: [http://localhost:8481/select/0/vmui/](http://localhost:8481/select/0/vmui/)
+
+### Notas Importantes
+- **Elasticidade**: Se tu precisar de mais storage, tu pode rodar `docker-compose up -d --scale vmstorage=2` (embora precise ajustar as flags de discovery em produção, no Docker local o modo cluster facilita a separação de processos).
+- **Grafana**: Lembre-se de que a URL do Prometheus no Grafana agora deve ser: `http://vmselect:8481/select/0/prometheus/`.
+- **Permissões**: Se o erro de "cannot read" persistir no log do `vmagent`, verifique se tu não fez merda! Não, calma.. Foi mal. Veja se tu não criou o arquivo `prometheus.yml` como usuário root enquanto tenta rodar o docker com outro usuário.
