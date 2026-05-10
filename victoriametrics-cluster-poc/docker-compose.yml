@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # --- VICTORIAMETRICS CLUSTER ---
+  vmstorage:
+    image: victoriametrics/vmstorage:v1.94.0-cluster
+    container_name: vmstorage
+    ports:
+      - "8482:8482"
+    volumes:
+      - vmdata:/storage
+    command:
+      - "--storageDataPath=/storage"
+
+  vminsert:
+    image: victoriametrics/vminsert:v1.94.0-cluster
+    container_name: vminsert
+    depends_on:
+      - vmstorage
+    ports:
+      - "8480:8480"
+    command:
+      - "--storageNode=vmstorage:8400"
+
+  vmselect:
+    image: victoriametrics/vmselect:v1.94.0-cluster
+    container_name: vmselect
+    depends_on:
+      - vmstorage
+    ports:
+      - "8481:8481"
+    command:
+      - "--storageNode=vmstorage:8401"
+
+  vmagent:
+    image: victoriametrics/vmagent:v1.94.0
+    container_name: vmagent
+    depends_on:
+      - vminsert
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--promscrape.config=/etc/prometheus/prometheus.yml"
+      - "--remoteWrite.url=http://vminsert:8480/insert/0/prometheus/api/v1/write"
+
+  # --- MICROSERVIÇOS & EXPORTERS ---
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d app_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://user:password@db:5432/app_db?sslmode=disable"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_broker
+    ports:
+      - "15672:15672" # Management UI
+      - "15692:15692" # Prometheus Metrics Port
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    image: nginx:alpine
+    container_name: frontend_app
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx_exporter
+    command:
+      - "-nginx.scrape-uri=http://frontend:80/nginx_status"
+    depends_on:
+      - frontend
+
+  # --- VISUALIZAÇÃO ---
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  vmdata:
