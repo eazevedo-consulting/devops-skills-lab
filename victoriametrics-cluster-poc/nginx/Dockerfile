@@ -8,6 +8,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Static site
 COPY index.html /usr/share/nginx/html/index.html
+COPY south-park.html /usr/share/nginx/html/south-park.html
+COPY images/ /usr/share/nginx/html/images/
 
 # Custom entrypoint
 COPY docker-entrypoint.sh /docker-entrypoint.sh
