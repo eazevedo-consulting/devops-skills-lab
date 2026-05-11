@@ -1,16 +1,20 @@
-version: '3.8'
-
 services:
+
   # --- VICTORIAMETRICS CLUSTER ---
   vmstorage:
     image: victoriametrics/vmstorage:v1.94.0-cluster
     container_name: vmstorage
     ports:
-      - "8482:8482"
+      - "8482:8482"   # HTTP API
+      - "8400:8400"   # vminsert ingestion port
+      - "8401:8401"   # vmselect query port
     volumes:
       - vmdata:/storage
     command:
       - "--storageDataPath=/storage"
+      - "--retentionPeriod=30d"
+    networks:
+      - monitoring
 
   vminsert:
     image: victoriametrics/vminsert:v1.94.0-cluster
@@ -21,6 +25,8 @@ services:
       - "8480:8480"
     command:
       - "--storageNode=vmstorage:8400"
+    networks:
+      - monitoring
 
   vmselect:
     image: victoriametrics/vmselect:v1.94.0-cluster
@@ -31,6 +37,8 @@ services:
       - "8481:8481"
     command:
       - "--storageNode=vmstorage:8401"
+    networks:
+      - monitoring
 
   vmagent:
     image: victoriametrics/vmagent:v1.94.0
@@ -42,8 +50,10 @@ services:
     command:
       - "--promscrape.config=/etc/prometheus/prometheus.yml"
       - "--remoteWrite.url=http://vminsert:8480/insert/0/prometheus/api/v1/write"
+    networks:
+      - monitoring
 
-  # --- MICROSERVIÇOS & EXPORTERS ---
+  # --- MICROSERVICOS & EXPORTERS ---
   db:
     image: postgres:15
     container_name: postgres_db
@@ -56,6 +66,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - monitoring
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
@@ -65,18 +77,43 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - monitoring
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq_broker
     ports:
-      - "15672:15672" # Management UI
-      - "15692:15692" # Prometheus Metrics Port
+      - "15672:15672"  # Management UI
+      - "15692:15692"  # Prometheus metrics
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - monitoring
+
+  # FIX: certbot runs first and must complete before nginx starts.
+  # The letsencrypt volume is rw here (owner) and rw on frontend (reader).
+  certbot:
+    image: certbot/dns-cloudflare
+    container_name: certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt:rw
+      - ./certbot/www:/var/www/certbot:rw
+      - ./cloudflare.ini:/etc/letsencrypt/cloudflare.ini:ro
+    command: >
+      certonly
+      --dns-cloudflare
+      --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini
+      -d monitor-poc.eazevedo.online
+      --email admin@eazevedo.online
+      --agree-tos
+      --no-eff-email
+      --non-interactive
+    networks:
+      - monitoring
 
   frontend:
     build:
@@ -86,39 +123,48 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080"   # Internal nginx_status for nginx-exporter (never exposed to public)
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
+      # FIX: was :ro — must be :rw so entrypoint can write dummy cert symlinks
+      # and so nginx can follow symlinks created by certbot
+      - ./certbot/conf:/etc/letsencrypt:rw
+      - ./certbot/www:/var/www/certbot:rw
+    depends_on:
+      - certbot
+    networks:
+      - monitoring
 
-  certbot:
-    image: certbot/dns-cloudflare
-    container_name: certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-      - ./cloudflare.ini:/etc/letsencrypt/cloudflare.ini:ro
-    command: certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini -d monitor-poc.eazevedo.online --email admin@eazevedo.online --agree-tos --no-eff-email
-
+  # FIX: nginx_status must be served on port 8080 (internal), not 80 (public redirect)
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     container_name: nginx_exporter
     command:
-      - "-nginx.scrape-uri=http://frontend:80/nginx_status"
+      - "-nginx.scrape-uri=http://frontend:8080/nginx_status"
     depends_on:
       - frontend
+    networks:
+      - monitoring
 
-  # --- VISUALIZAÇÃO ---
+  # --- VISUALIZACAO ---
   grafana:
     image: grafana/grafana:10.1.0
     container_name: grafana
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - vmselect
+    networks:
+      - monitoring
 
 volumes:
   vmdata:
+
+networks:
+  monitoring:
+    driver: bridge
